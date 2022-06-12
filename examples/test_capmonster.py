@@ -1,26 +1,35 @@
 import imaplib
-from ssl import SSLSession
-import time
+import os
 import re
+import time
+import asyncio
+import random
+
+import dotenv
 from requests import Session
+from capmonstercloudclient import CapMonsterClient, ClientOptions
+from capmonstercloudclient.requests import RecaptchaV2EnterpriseProxylessRequest
+from latest_user_agents import get_random_user_agent
+
+# add path to steampy
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from steampy.utils import convert_edomain_to_imap
-from steampy.login import LoginExecutor
-from controller import InvalidEmail, AntiCaptcha
 
 
-anticaptcha = AntiCaptcha()
-anticaptcha.set_verbose(1)
-anticaptcha.set_key("96c6a2734d83360b1f968e6e926c54d5")
-anticaptcha.set_user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; \
-                           x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36")
+dotenv.load_dotenv()
+
+
+class InvalidEmail(Exception): pass
 
 
 def authorize_email(email, email_password):
     email_domain = re.search(r"@(.+$)", email).group(1)
-    imap_host = convert_edomain_to_imap(email_domain,  LoginExecutor.IMAP_HOSTS)
+    imap_host = convert_edomain_to_imap(email_domain,
+                                        additional_hosts={"imap.firstmail.ltd": ["fuymailer.online"]})
 
     if imap_host is None:
-        raise InvalidEmail("Не удается найти imap host для данного email домена: %s" % email_domain)
+        raise Exception("Не удается найти imap host для данного email домена: %s", email_domain)
     server = imaplib.IMAP4_SSL(imap_host)
     server.login(email, email_password)
     server.select()
@@ -73,37 +82,40 @@ def confirm_email(session, gid, token, email: str):
     return creationid
 
 
-def main():
+async def solve_captcha_async():
+    task = asyncio.create_task(cap_monster_client.solve_captcha(recaptcha2request))
+    return await asyncio.gather(task, return_exceptions=True)
+
+
+if __name__ == '__main__':
+    capmonster_api_key = os.getenv('CAPMONSTER_API_KEY')
     session = Session()
-    session.headers.update({'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36'),
+    session.headers.update({'User-Agent': get_random_user_agent(),
                             'Accept-Language': 'q=0.8,en-US;q=0.6,en;q=0.4'})
     session.headers.update({'Host': 'store.steampowered.com'})
     session.get("https://store.steampowered.com/join/")
-    response = session.get('https://store.steampowered.com/join/refreshcaptcha/?count=1', timeout=30).json()
+    response = session.get('https://store.steampowered.com/join/refreshcaptcha', timeout=30).json()
     gid, sitekey, s = response['gid'], response['sitekey'], response['s']
-    anticaptcha.set_website_key(sitekey)
-    anticaptcha.set_website_url('https://store.steampowered.com/join/refreshcaptcha/?count=1')
-    anticaptcha.set_enterprise_payload({'data-s': s})
 
-    cookies: str = ""
-    for key, value in session.cookies.iteritems():
-        cookies += key + "=" + value + ";"
-    anticaptcha.set_cookies(cookies)
+    client_options = ClientOptions(api_key=capmonster_api_key)
+    cap_monster_client = CapMonsterClient(options=client_options)
 
-    token = anticaptcha.solve_and_return_solution()
-    email = "awdasdwadawd@yandex.ru:viga9982"  # твоя почта
+    recaptcha2request = RecaptchaV2EnterpriseProxylessRequest(websiteUrl='https://store.steampowered.com/join/refreshcaptcha/',
+                                                              websiteKey=sitekey, enterprisePayload=s)
+    async_responses = asyncio.run(solve_captcha_async())
+    token = async_responses[0]["gRecaptchaResponse"]
+    with open("../resources/emails.txt") as f:
+        emails = f.readlines()
+    email = emails[random.randint(0, len(emails) - 1)].rstrip()
     creationid = confirm_email(session, gid, token, email)
+    # randomize accountname and password
+    credential = ["qwertyuiopasdfghjklzxcvbnm1234567890"]
     data = {
-        'accountname': "wadwawasag1",  # логин для стим аккаунта
-        'password': "Asdfelsk",  # пароль для стим аккаунта
+        'accountname': random.shuffle(credential[:8]),
+        'password': random.shuffle(credential[:8]),
         'count': '32',
         'lt': '0',
         'creation_sessionid': creationid
     }
     resp = session.post('https://store.steampowered.com/join/createaccount/',
                         data=data, timeout=25)
-    print(resp.text)
-
-
-main()

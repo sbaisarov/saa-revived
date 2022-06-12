@@ -9,8 +9,6 @@ import shelve
 import imaplib
 
 from requests.exceptions import Timeout, ConnectionError, ProxyError
-from anticaptchaofficial import *∏
-from anticaptchaofficial.recaptchav2enterpriseproxyless import *
 
 from steampy.client import SteamClient
 from steampy.login import CaptchaRequired
@@ -23,9 +21,6 @@ logger = logging.getLogger('__main__')
 
 
 class SteamAuthError(Exception): pass
-
-
-class RuCaptchaError(Exception): pass
 
 
 class LimitReached(Exception): pass
@@ -55,11 +50,7 @@ class Controller:
 
     def set_captcha_service(self):
         api_key = self.client.captcha_api_key.get()
-        captcha_host = self.client.captcha_host.get()
-        if self.client.captcha_service_type.get() == CaptchaService.RuCaptcha:
-            self.captcha_service = RuCaptcha(api_key, captcha_host)
-        elif self.client.captcha_service_type.get() == CaptchaService.AntiCaptcha:
-            self.captcha_service = AntiCaptcha(api_key)
+
 
     @staticmethod
     def request_post(session, url, data=None, headers=None, timeout=30):
@@ -192,7 +183,7 @@ class Controller:
 
     def addphone_request(self, steam_client, phone_num):
         sessionid = steam_client.session.cookies.get(
-            'sessionid', domain='steamcommunity.com')
+            'sessionid', domain='steamcommunity.com'),
         data = {
             'op': 'add_pho                         })['response']
             except json.decoder.JSONDecodeError:
@@ -537,111 +528,3 @@ class Controller:
                 data.append(result)
 
         return result
-
-
-class RuCaptcha:
-
-    def __init__(self, api_key, host="rucaptcha.com"):
-        if host != "rucaptcha.com":
-            host = re.search(r"(?:https?://)?(.+)/?", host)
-            if host is None:
-                raise Exception("Не удалось получить домен рукапчи")
-            host = host.group(1)
-   
-        self.host = f"http://{host}"
-        self.api_key = api_key
-
-    def get_balance(self):
-        resp = requests.post(self.host + '/res.php',
-                             data={'key': self.api_key,
-                                   'action': 'getbalance'})
-        logger.info(resp.text)
-        if 'ERROR_ZERO_BALANCE' in resp.text:
-            raise RuCaptchaError('На счету нулевой баланс')
-        elif 'ERROR_WRONG_USER_KEY' in resp.text or 'ERROR_KEY_DOES_NOT_EXIST' in resp.text:
-            raise RuCaptchaError('Неправильно введен API ключ')
-
-        return resp.text
-
-    def generate_captcha_img(self, captcha_img):
-        resp = requests.post(self.host + '/in.php',
-                             files={'file': ('captcha', captcha_img, 'image/png')},
-                             data={'key': self.api_key},
-                             timeout=30)
-
-        captcha_id = resp.text.partition('|')[2]
-        return captcha_id
-
-    def generate_recaptcha(self, sitekey):
-        resp = requests.post(self.host + '/in.php',
-                             params={'key': self.api_key, 'method': 'userrecaptcha', 'googlekey': sitekey,
-                                     'enterprise': 1, 'action': 'verify', 'min_score': 0.3,
-                                     'pageurl': 'https://store.steampowered.com/join/refreshcaptcha/?count=1',
-                                     'version': 'v3'
-                                     },
-                             timeout=30)
-        captcha_id = resp.text.partition('|')[2]
-        return captcha_id
-
-    def resolve_captcha(self, captcha_id):
-        while True:
-            time.sleep(5)
-            r = requests.post(self.host + '/res.php',
-                              params={
-                                  'action': 'get', 'key': self.api_key, 'id': captcha_id
-                                  },
-                              timeout=30)
-            logger.info(r.text)
-            if 'CAPCHA_NOT_READY' in r.text:
-                continue
-            elif 'ERROR_CAPTCHA_UNSOLVABLE' in r.text:
-                self.report_bad(captcha_id)
-                return ""
-            break
-
-        self.report_good(captcha_id)
-        return r.text.split('|')
-
-    def report_bad(self, captcha_id):
-        requests.post(self.host + '/res.php' + '?key={}&action=reportbad&id={}'
-                      .format(self.api_key, captcha_id), timeout=30)
-
-    def report_good(self, captcha_id):
-        requests.post(self.host + '/res.php' + '?key={}&action=reportgood&id={}'
-                      .format(self.api_key, captcha_id), timeout=30)
-
-
-class AntiCaptcha():
-
-    def __init__(self):
-        super().__init__()
-
-    def captcha_await(url, key, s):
-        r = requests.get('http://2captcha.com/in.php?key=key_here&method=userrecaptcha&enterprise=1&googlekey=' + str(
-            key) + '&pageurl=' + str(url) + '&data-s=' + str(
-            s) + '&userAgent=Mozilla/5.0 (Windows; U; Windows NT 10.0; en-US; Valve Steam Client/default/0; ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36&json=1&domain=recaptcha.net',
-                         verify=False).json()
-        taskId = str(r['request'])
-        time.sleep(10)
-        while True:
-            r = requests.get('http://2captcha.com/res.php?key=key_here&action=get&id=' + str(taskId) + '&json=1',
-                             verify=False).json()
-            print(r)
-            if str(r['status']) == '1':
-                break
-            time.sleep(10)
-        return str(r['request'])
-
-
-
-def captcha_await(url, key, s):
-    r = requests.get('http://2captcha.com/in.php?key=key_here&method=userrecaptcha&enterprise=1&googlekey='+str(key)+'&pageurl='+str(url)+'&data-s='+str(s)+'&userAgent=Mozilla/5.0 (Windows; U; Windows NT 10.0; en-US; Valve Steam Client/default/0; ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36&json=1&domain=recaptcha.net', verify=False).json()
-    taskId = str(r['request'])
-    time.sleep(10)
-    while True:
-        r = requests.get('http://2captcha.com/res.php?key=key_here&action=get&id='+str(taskId)+'&json=1', verify=False).json()
-        print(r)
-        if str(r['status']) == '1':
-            break
-        time.sleep(10)
-    return str(r['request'])

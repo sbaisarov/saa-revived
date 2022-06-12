@@ -177,6 +177,7 @@ def convert_edomain_to_imap(email_domain, additional_hosts={}):
             list(map(lambda domain: domains_and_hosts[imap_host].append(domain), domains))
         except (KeyError, TypeError):
             domains_and_hosts[imap_host] = domains
+
     for host, domains in domains_and_hosts.items():
         if email_domain in domains:
             return host

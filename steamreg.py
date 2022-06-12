@@ -11,7 +11,6 @@ import imaplib
 import collections
 
 from requests.exceptions import Timeout, ConnectionError, ProxyError
-from python_anticaptcha import AnticaptchaClient, ImageToTextTask, NoCaptchaTaskProxylessTask
 
 from steampy.client import SteamClient
 from steampy.login import CaptchaRequired
