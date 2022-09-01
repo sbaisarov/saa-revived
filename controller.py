@@ -4,13 +4,13 @@ import string
 import random
 import re
 import json
-import io
 import logging
 import shelve
 import imaplib
 
 from requests.exceptions import Timeout, ConnectionError, ProxyError
-from python_anticaptcha import AnticaptchaClient, ImageToTextTask, NoCaptchaTaskProxylessTask
+from anticaptchaofficial import *
+from anticaptchaofficial.recaptchav2enterpriseproxyless import *
 
 from steampy.client import SteamClient
 from steampy.login import CaptchaRequired
@@ -59,7 +59,7 @@ class Controller:
         if self.client.captcha_service_type.get() == CaptchaService.RuCaptcha:
             self.captcha_service = RuCaptcha(api_key, captcha_host)
         elif self.client.captcha_service_type.get() == CaptchaService.AntiCaptcha:
-            self.captcha_service = AntiCaptcha(api_key, captcha_host)
+            self.captcha_service = AntiCaptcha(api_key)
 
     @staticmethod
     def request_post(session, url, data=None, headers=None, timeout=30):
@@ -386,13 +386,9 @@ class Controller:
             return key
 
     def resolve_captcha(self, captcha_id):
-        result = self.captcha_service.resolve_captcha(captcha_id)
-        logger.info("Resolved captcha: %s", result)
-        try:
-            status, token, price = result
-        except ValueError:
-            price = 0
-            status, token, price = result
+        status, token, price = self.captcha_service.resolve_captcha(captcha_id)
+        logger.info("Resolved captcha: %s", status)
+        self.client.add_log("Resolved captcha: %s", status)
 
         self.captchas_expenses_total += float(price)
         self.client.captchas_expenses_stat.set("Потрачено на капчи: %d" % self.captchas_expenses_total)
@@ -699,41 +695,8 @@ class RuCaptcha:
                       .format(self.api_key, captcha_id), timeout=30)
 
 
-class AntiCaptcha(AnticaptchaClient):
+class AntiCaptcha(recaptchaV2EnterpriseProxyless):
 
-    def __init__(self, api_key, host="api.anti-captcha.com"):
-        if host != "rucaptcha.com":
-            host = re.search(r"(?:https?://)?(.+)/?", host)
-            if host is None:
-                raise Exception("Не удалось получить домен рукапчи")
-            host = "http://" + host.group(1)
-        self.host = host
-        self.api_key = api_key
-        super().__init__(api_key, host=host)
+    def __init__(self):
+        super().__init__()
 
-    def get_balance(self):
-        return self.getBalance()
-
-    def generate_captcha_img(self, captcha_img):
-        task = ImageToTextTask(io.BytesIO(captcha_img))
-        job = self.createTask(task)
-        return job
-
-    def generate_recaptcha(self, sitekey):
-        task = NoCaptchaTaskProxylessTask("https://store.steampowered.com/join/refreshcaptcha/?count=1",
-                                          sitekey)
-        job = self.createTask(task)
-        return job
-
-    @staticmethod
-    def resolve_captcha(job):
-        job.join()
-        status, price = job.last_result["status"], job._last_result["cost"]
-        try:
-            solution = job.get_solution_response()  # ReCaptcha
-        except KeyError:
-            solution = job.get_captcha_text()
-        return status, solution, price
-
-    def report_bad(self, job):
-        self.reportIncorrectImage(job.task_id)

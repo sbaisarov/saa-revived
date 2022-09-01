@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-python-anticaptcha = "==0.7.1"
+anticaptchaofficial = "*"
 requests = "==2.27.1"
 bs4 = "==0.0.1"
 cert-human = "==1.0.7"
