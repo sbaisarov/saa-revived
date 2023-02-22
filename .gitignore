@@ -4,7 +4,7 @@
 webserver
 Pipfile.lock
 *.txt
-.DS_Store
+**/.DS_Store
 database/tmplcounters
 steampy/__pycache__/client.cpython-38.pyc
 steampy/.DS_Store

@@ -9,7 +9,7 @@ import shelve
 import imaplib
 
 from requests.exceptions import Timeout, ConnectionError, ProxyError
-from anticaptchaofficial import *
+from anticaptchaofficial import *∏
 from anticaptchaofficial.recaptchav2enterpriseproxyless import *
 
 from steampy.client import SteamClient
@@ -194,91 +194,7 @@ class Controller:
         sessionid = steam_client.session.cookies.get(
             'sessionid', domain='steamcommunity.com')
         data = {
-            'op': 'add_phone_number',
-            'arg': phone_num,
-            'sessionid': sessionid
-        }
-        response = self.request_post(steam_client.session,
-                                     'https://steamcommunity.com/steamguard/phoneajax', data=data)
-        logger.info(response)
-        return response["success"]
-
-    def fetch_email_code(self, email, email_password, steam_client):
-        server = self.authorize_email(email, email_password)
-        attempts = 0
-        success = False
-        while attempts < 5:
-            attempts += 1
-            result, data = server.uid('search', '', 'ALL')
-            uid = data[0].split()[-1]
-            result, data = server.uid("fetch", uid, '(UID BODY[TEXT])')
-            try:
-                mail = data[0][1].decode('utf-8')
-                link = re.search(r'https://.+ConfirmEmailForAdd.+?"', mail)
-                if link is not None:
-                    link = link.group().rstrip('"')
-                steam_client.session.get(link)
-                success = True
-                break
-            except AttributeError:
-                time.sleep(5)
-                continue
-        server.close()
-        return success
-
-    def email_confirmation(self, steam_client):
-        sessionid = steam_client.session.cookies.get(
-            'sessionid', domain='steamcommunity.com')
-        data = {
-            'op': 'email_confirmation',
-            'arg': None,
-            'sessionid': sessionid
-        }
-        response = self.request_post(steam_client.session,
-                                     'https://steamcommunity.com/steamguard/phoneajax', data=data)
-        return response["success"]
-
-    def is_phone_attached(self, steam_client):
-        sessionid = steam_client.session.cookies.get(
-            'sessionid', domain='steamcommunity.com')
-        data = {
-            'op': 'has_phone',
-            'arg': None,
-            'sessionid': sessionid
-        }
-        response = self.request_post(steam_client.session,
-                                     'https://steamcommunity.com/steamguard/phoneajax', data=data)
-
-        return response['has_phone']
-
-    def checksms_request(self, steam_client, sms_code):
-        sessionid = steam_client.session.cookies.get(
-            'sessionid', domain='steamcommunity.com')
-        data = {
-            'op': 'check_sms_code',
-            'arg': sms_code,
-            'sessionid': sessionid
-        }
-        response = self.request_post(
-            steam_client.session, 'https://steamcommunity.com/steamguard/phoneajax', data=data)
-        logger.info(response)
-        return response["success"]
-
-    def add_authenticator_request(self, steam_client):
-        device_id = guard.generate_device_id(steam_client.oauth['steamid'])
-        attempts = 0
-        mobguard_data = None
-        while attempts < 3:
-            try:
-                mobguard_data = self.request_post(steam_client.session,
-                                                  'https://api.steampowered.com/ITwoFactorService/AddAuthenticator/v0001/',
-                                                  data={
-                                                      "access_token": steam_client.oauth['oauth_token'],
-                                                      "steamid": steam_client.oauth['steamid'],
-                                                      "authenticator_type": 1,
-                                                      "device_identifier": device_id,
-                                                      "sms_phone_id": 1
-                                                  })['response']
+            'op': 'add_pho                         })['response']
             except json.decoder.JSONDecodeError:
                 time.sleep(3)
                 attempts += 1
@@ -695,8 +611,37 @@ class RuCaptcha:
                       .format(self.api_key, captcha_id), timeout=30)
 
 
-class AntiCaptcha(recaptchaV2EnterpriseProxyless):
+class AntiCaptcha():
 
     def __init__(self):
         super().__init__()
 
+    def captcha_await(url, key, s):
+        r = requests.get('http://2captcha.com/in.php?key=key_here&method=userrecaptcha&enterprise=1&googlekey=' + str(
+            key) + '&pageurl=' + str(url) + '&data-s=' + str(
+            s) + '&userAgent=Mozilla/5.0 (Windows; U; Windows NT 10.0; en-US; Valve Steam Client/default/0; ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36&json=1&domain=recaptcha.net',
+                         verify=False).json()
+        taskId = str(r['request'])
+        time.sleep(10)
+        while True:
+            r = requests.get('http://2captcha.com/res.php?key=key_here&action=get&id=' + str(taskId) + '&json=1',
+                             verify=False).json()
+            print(r)
+            if str(r['status']) == '1':
+                break
+            time.sleep(10)
+        return str(r['request'])
+
+
+
+def captcha_await(url, key, s):
+    r = requests.get('http://2captcha.com/in.php?key=key_here&method=userrecaptcha&enterprise=1&googlekey='+str(key)+'&pageurl='+str(url)+'&data-s='+str(s)+'&userAgent=Mozilla/5.0 (Windows; U; Windows NT 10.0; en-US; Valve Steam Client/default/0; ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36&json=1&domain=recaptcha.net', verify=False).json()
+    taskId = str(r['request'])
+    time.sleep(10)
+    while True:
+        r = requests.get('http://2captcha.com/res.php?key=key_here&action=get&id='+str(taskId)+'&json=1', verify=False).json()
+        print(r)
+        if str(r['status']) == '1':
+            break
+        time.sleep(10)
+    return str(r['request'])

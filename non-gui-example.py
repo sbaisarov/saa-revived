@@ -26,6 +26,7 @@ def authorize_email(email, email_password):
     server.select()
     return server
 
+
 def fetch_confirmation_link(email, email_password, creationid):
     server = authorize_email(email, email_password)
     attempts = 0
@@ -83,9 +84,9 @@ def main():
     gid, sitekey, s = response['gid'], response['sitekey'], response['s']
     anticaptcha.set_website_key(sitekey)
     anticaptcha.set_website_url('https://store.steampowered.com/join/refreshcaptcha/?count=1')
-    anticaptcha.set_enterprise_payload({'s': s})
+    anticaptcha.set_enterprise_payload({'data-s': s})
 
-    cookies :str = ""
+    cookies: str = ""
     for key, value in session.cookies.iteritems():
         cookies += key + "=" + value + ";"
     anticaptcha.set_cookies(cookies)
