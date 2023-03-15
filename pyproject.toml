@@ -50,6 +50,8 @@ yapf = "^0.32.0"
 capmonstercloudclient = "^1.1.0"
 python-dotenv = "^1.0.0"
 latest-user-agents = "^0.0.3"
+pytest = "^7.2.2"
+anticaptchaofficial = "^1.0.47"
 
 
 [build-system]

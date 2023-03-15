@@ -2,22 +2,20 @@ import imaplib
 import os
 import re
 import time
-import asyncio
 import random
 
 import dotenv
 from requests import Session
-from capmonstercloudclient import CapMonsterClient, ClientOptions
-from capmonstercloudclient.requests import RecaptchaV2EnterpriseProxylessRequest
-from latest_user_agents import get_random_user_agent
+import twocaptcha
 
 # add path to steampy
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from steampy.utils import convert_edomain_to_imap
-
+from latest_user_agents import get_random_user_agent
 
 dotenv.load_dotenv()
+resolver = twocaptcha.TwoCaptcha(os.getenv("TWOCAPTCHA_API_KEY"))
 
 
 class InvalidEmail(Exception): pass
@@ -82,28 +80,22 @@ def confirm_email(session, gid, token, email: str):
     return creationid
 
 
-async def solve_captcha_async():
-    task = asyncio.create_task(cap_monster_client.solve_captcha(recaptcha2request))
-    return await asyncio.gather(task, return_exceptions=True)
-
-
 if __name__ == '__main__':
-    capmonster_api_key = os.getenv('CAPMONSTER_API_KEY')
     session = Session()
     session.headers.update({'User-Agent': get_random_user_agent(),
                             'Accept-Language': 'q=0.8,en-US;q=0.6,en;q=0.4'})
     session.headers.update({'Host': 'store.steampowered.com'})
     session.get("https://store.steampowered.com/join/")
-    response = session.get('https://store.steampowered.com/join/refreshcaptcha', timeout=30).json()
+    response = session.get('https://store.steampowered.com/join/refreshcaptcha/', timeout=30).json()
     gid, sitekey, s = response['gid'], response['sitekey'], response['s']
+    # cookies: str = ""
+    # for key, value in session.cookies.iteritems():
+    #     cookies += key + "=" + value + ";"
+    # tocaptcha.set_cookies(cookies)
 
-    client_options = ClientOptions(api_key=capmonster_api_key)
-    cap_monster_client = CapMonsterClient(options=client_options)
-
-    recaptcha2request = RecaptchaV2EnterpriseProxylessRequest(websiteUrl='https://store.steampowered.com/join/refreshcaptcha/',
-                                                              websiteKey=sitekey, enterprisePayload=s)
-    async_responses = asyncio.run(solve_captcha_async())
-    token = async_responses[0]["gRecaptchaResponse"]
+    result = resolver.recaptcha(sitekey, 'https://store.steampowered.com/join/refreshcaptcha/',
+                                invisible=0, enterprise=1, datas=s)
+    token = result["code"]
     with open("../resources/emails.txt") as f:
         emails = f.readlines()
     email = emails[random.randint(0, len(emails) - 1)].rstrip()
@@ -119,3 +111,4 @@ if __name__ == '__main__':
     }
     resp = session.post('https://store.steampowered.com/join/createaccount/',
                         data=data, timeout=25)
+    print(resp.text)
